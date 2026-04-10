@@ -1,0 +1,111 @@
+# ============================================
+# 山寨币现货异动狙击系统配置文件
+# ============================================
+
+# 市场配置
+market:
+  exchange: "binance"
+  quote_currency: "USDT"
+  blacklist:
+    - "BTCUSDT"
+    - "ETHUSDT"
+    - "BNBUSDT"
+    - "SOLUSDT"
+    - "XRPUSDT"
+    - "ADAUSDT"
+    - "DOGEUSDT"
+    - "USDCUSDT"
+    - "DAIUSDT"
+    - "TUSDUSDT"
+    - "BUSDUSDT"
+    - "FDUSDUSDT"
+    - "PAXGUSDT"
+    - "WBTCUSDT"
+    - "WBETHUSDT"
+
+# 触发阈值
+thresholds:
+  vol_multiplier: 5.0              # 单根K线成交量倍数
+  vol_continuous_multiplier: 3.0   # 连续验证倍数
+  min_24h_vol: 10000000            # 最小日交易额 (USDT)
+  max_24h_vol: 100000000           # 最大日交易额 (USDT)
+  price_surge_1m: 0.015            # 1分钟最小涨幅 (1.5%)
+  breakout_margin: 0.005           # 突破幅度要求 (0.5%)
+  max_spread: 0.005                # 最大买卖价差 (0.5%)
+  consolidation_hours: 12          # 盘整期检查时长
+  consolidation_max_change: 0.10   # 盘整期最大涨幅 (10%)
+
+# 风险管理
+risk:
+  position_size: 500               # 每笔交易金额 (USDT)
+  max_open_positions: 5            # 最大同时持仓数
+  stop_loss_pct: 0.04              # 初始止损 (4%)
+  breakeven_trigger: 0.03          # 保本止损触发涨幅 (3%)
+  breakeven_level: 0.01            # 保本止损位置 (1%)
+  slippage_tolerance: 0.01         # 最大滑点容忍 (1%)
+
+# 止盈配置
+take_profit:
+  stage1_trigger: 0.05             # 第一阶段触发 (5%)
+  stage1_portion: 0.30             # 第一阶段止盈比例 (30%)
+  stage2_trigger: 0.10             # 第二阶段触发 (10%)
+  stage2_portion: 0.30             # 第二阶段止盈比例 (30%)
+  trailing_atr_multiplier: 2.0     # Trailing Stop ATR 倍数
+
+# 大盘保护
+market_protection:
+  btc_5m_threshold: -0.01          # BTC 5分钟跌幅阈值
+  btc_1h_threshold: -0.03          # BTC 1小时跌幅阈值
+
+# API 限频
+rate_limit:
+  rest_requests_per_min: 600       # REST API 每分钟请求数上限
+  ws_reconnect_delay: 5            # WebSocket 重连延迟 (秒)
+
+# 数据设置
+data:
+  history_window_minutes: 60       # 滚动窗口大小 (分钟)
+  high_window_minutes: 1440        # 24小时高点窗口 (分钟)
+  persistence_interval: 300        # 数据持久化间隔 (秒)
+
+# 运行模式
+mode:
+  paper_trading: true              # 模拟交易模式 (true=不实际下单)
+  backtest: false                  # 回测模式
+  debug: false                     # 调试模式
+
+# 日志配置
+logging:
+  level: "INFO"                    # 日志级别: DEBUG, INFO, WARNING, ERROR
+  console: true                    # 是否输出到控制台
+  file: true                       # 是否输出到文件
+  rotation: "10 MB"                # 日志文件轮转大小
+  retention: "7 days"              # 日志保留时间
+
+# ============================================
+# 合约联动配置 [扩展功能 - Phase 5+]
+# ============================================
+futures:
+  enabled: false                   # 是否启用合约监控
+
+  # 轧空信号阈值
+  squeeze_detection:
+    funding_rate_warning: -0.0001  # 费率警告阈值 (-0.01%)
+    funding_rate_critical: -0.0005 # 费率极端阈值 (-0.05%)
+    oi_drop_threshold: 0.10        # OI下降触发阈值 (10%)
+
+  # 信号增强权重
+  signal_boost:
+    funding_warning: 1             # 费率警告时优先级 +1
+    funding_critical: 2            # 费率极端时优先级 +2
+
+  # 轧空猎手模式
+  squeeze_hunter:
+    enabled: false                 # 是否启用独立轧空触发
+    min_funding_rate: -0.0003      # 触发最低费率 (-0.03%)
+    min_price_change: 0.01         # 触发最低涨幅 (1%)
+
+  # 风险控制
+  risk_adjustment:
+    high_basis_threshold: 0.005    # 高基差警告阈值 (0.5%)
+    position_reduction: 0.5        # 高基差时仓位缩减比例

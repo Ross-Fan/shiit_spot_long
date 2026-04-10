@@ -40,14 +40,30 @@
 - Python 3.8+
 - 稳定的网络连接（需访问币安 API）
 
-### 2. 安装依赖
+### 2. 创建虚拟环境
 
 ```bash
 cd shiit_spot_long
+
+# 创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境
+# macOS / Linux:
+source venv/bin/activate
+
+# Windows:
+# venv\Scripts\activate
+```
+
+### 3. 安装依赖
+
+```bash
+# 确保已激活虚拟环境 (命令行前会显示 (venv))
 pip install -r requirements.txt
 ```
 
-### 3. 配置 API 密钥
+### 4. 配置 API 密钥
 
 ```bash
 # 复制示例配置
@@ -60,14 +76,21 @@ BINANCE_API_SECRET=your_api_secret_here
 
 > **注意**: API 密钥需要开启现货交易权限。如果只是模拟交易，可以不配置。
 
-### 4. 运行程序
+### 5. 运行程序
 
 ```bash
+# 确保已激活虚拟环境
+source venv/bin/activate  # macOS / Linux
+
 # 默认以模拟交易模式运行
 python main.py
 ```
 
-### 5. 切换实盘模式
+### 6. 停止程序
+
+按 `Ctrl + C` 停止程序，系统会自动保存数据并输出交易统计。
+
+### 7. 切换实盘模式
 
 编辑 `config/config.yaml`：
 

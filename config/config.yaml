@@ -27,8 +27,8 @@ market:
 thresholds:
   vol_multiplier: 5.0              # 单根K线成交量倍数
   vol_continuous_multiplier: 3.0   # 连续验证倍数
-  min_24h_vol: 10000000            # 最小日交易额 (USDT)
-  max_24h_vol: 100000000           # 最大日交易额 (USDT)
+  min_24h_vol: 100000            # 最小日交易额 (USDT)
+  max_24h_vol: 50000000           # 最大日交易额 (USDT)
   price_surge_1m: 0.015            # 1分钟最小涨幅 (1.5%)
   breakout_margin: 0.005           # 突破幅度要求 (0.5%)
   max_spread: 0.005                # 最大买卖价差 (0.5%)

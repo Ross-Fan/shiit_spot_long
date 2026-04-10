@@ -390,6 +390,45 @@ class StreamManager:
         """获取交易对数据"""
         return self.symbols.get(symbol)
 
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        获取数据流统计信息
+
+        Returns:
+            统计信息字典
+        """
+        total_symbols = len(self.symbols)
+
+        # 统计有足够历史数据的币种（可以进行异动检测）
+        ready_symbols = sum(1 for sd in self.symbols.values() if len(sd.volumes) >= 10)
+
+        # 统计符合成交额条件的币种
+        min_24h_vol = self._thresholds.get('min_24h_vol', 10_000_000)
+        max_24h_vol = self._thresholds.get('max_24h_vol', 100_000_000)
+        qualified_symbols = sum(
+            1 for sd in self.symbols.values()
+            if min_24h_vol <= sd.quote_volume_24h <= max_24h_vol
+        )
+
+        # BTC 价格
+        btc_price = self._btc_last_price
+        btc_change_5m = self.get_btc_change(5)
+
+        # 数据完整度（有多少分钟的数据）
+        avg_data_minutes = 0
+        if self.symbols:
+            avg_data_minutes = sum(len(sd.volumes) for sd in self.symbols.values()) / len(self.symbols)
+
+        return {
+            'total_symbols': total_symbols,
+            'ready_symbols': ready_symbols,
+            'qualified_symbols': qualified_symbols,
+            'btc_price': btc_price,
+            'btc_change_5m': btc_change_5m,
+            'avg_data_minutes': avg_data_minutes,
+            'is_connected': self._ws is not None and self._ws.open if self._ws else False
+        }
+
     def _load_history(self) -> None:
         """加载历史数据"""
         try:

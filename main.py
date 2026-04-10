@@ -6,6 +6,7 @@
 import asyncio
 import signal
 import sys
+import time
 from typing import Optional
 
 from src.config import config
@@ -26,9 +27,14 @@ class TradingBot:
         self._validator: Optional[SignalValidator] = None
         self._order_manager: Optional[OrderManager] = None
         self._running = False
+        self._start_time: float = 0
 
         # 信号队列
         self._signal_queue: asyncio.Queue = asyncio.Queue()
+
+        # 信号计数
+        self._signal_count: int = 0
+        self._validated_count: int = 0
 
     async def start(self) -> None:
         """启动交易机器人"""
@@ -53,15 +59,18 @@ class TradingBot:
         await self._order_manager.start()
 
         self._running = True
+        self._start_time = time.time()
 
         # 启动任务
         tasks = [
             asyncio.create_task(self._stream_manager.start()),
             asyncio.create_task(self._process_signals()),
-            asyncio.create_task(self._status_reporter())
+            asyncio.create_task(self._status_reporter()),
+            asyncio.create_task(self._data_warmup_reporter())
         ]
 
-        logger.info("系统启动完成，开始监控...")
+        logger.info("系统启动完成，正在接收数据...")
+        logger.info("提示: 系统需要约 10 分钟积累数据后才能开始检测异动")
 
         try:
             await asyncio.gather(*tasks)
@@ -106,6 +115,7 @@ class TradingBot:
 
     def _on_signal(self, signal: Signal) -> None:
         """处理初筛信号"""
+        self._signal_count += 1
         try:
             self._signal_queue.put_nowait(signal)
         except asyncio.QueueFull:
@@ -113,6 +123,7 @@ class TradingBot:
 
     def _on_validated(self, result: ValidationResult) -> None:
         """处理验证通过的信号"""
+        self._validated_count += 1
         asyncio.create_task(self._execute_trade(result))
 
     async def _process_signals(self) -> None:
@@ -156,20 +167,90 @@ class TradingBot:
 
     async def _status_reporter(self) -> None:
         """定期输出状态报告"""
+        # 等待数据预热完成后再开始定期报告
+        await asyncio.sleep(600)  # 10分钟后开始
+
         while self._running:
             await asyncio.sleep(300)  # 每5分钟
 
-            if self._order_manager:
-                positions = self._order_manager.open_positions
-                if positions:
-                    logger.info(f"当前持仓 {len(positions)} 个:")
-                    for p in positions:
-                        pnl_pct = p.unrealized_pnl_pct
-                        logger.info(
-                            f"  {p.symbol}: 入场 {p.entry_price:.8g}, "
-                            f"最高 {p.highest_price:.8g}, "
-                            f"盈亏 {pnl_pct:+.2%}"
-                        )
+            self._print_status()
+
+    async def _data_warmup_reporter(self) -> None:
+        """数据预热期间的状态报告"""
+        # 报告时间点（从启动开始的秒数）
+        report_times = [30, 60, 120, 300, 600]  # 30秒、1分钟、2分钟、5分钟、10分钟
+        last_report = 0
+
+        for target_time in report_times:
+            wait_time = target_time - last_report
+            await asyncio.sleep(wait_time)
+            last_report = target_time
+
+            if not self._running:
+                return
+
+            stats = self._stream_manager.get_statistics()
+            elapsed = int(time.time() - self._start_time)
+            elapsed_str = f"{elapsed // 60}分{elapsed % 60}秒"
+
+            logger.info("-" * 40)
+            logger.info(f"[数据预热] 运行时间: {elapsed_str}")
+            logger.info(f"  接收币种数: {stats['total_symbols']}")
+            logger.info(f"  数据就绪: {stats['ready_symbols']} (需>=10分钟数据)")
+            logger.info(f"  符合条件: {stats['qualified_symbols']} (成交额在范围内)")
+            logger.info(f"  平均数据量: {stats['avg_data_minutes']:.1f} 分钟")
+
+            if stats['btc_price'] > 0:
+                logger.info(f"  BTC 价格: ${stats['btc_price']:,.2f}")
+
+            if stats['ready_symbols'] >= 50:
+                logger.info("  ✓ 数据积累充足，系统已进入正常监控状态")
+
+        # 预热完成，输出最终状态
+        logger.info("=" * 50)
+        logger.info("数据预热完成，系统进入正常运行状态")
+        self._print_status()
+
+    def _print_status(self) -> None:
+        """打印当前状态"""
+        if not self._stream_manager or not self._order_manager:
+            return
+
+        stats = self._stream_manager.get_statistics()
+        elapsed = int(time.time() - self._start_time)
+        hours, remainder = divmod(elapsed, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        if hours > 0:
+            elapsed_str = f"{hours}小时{minutes}分钟"
+        else:
+            elapsed_str = f"{minutes}分钟{seconds}秒"
+
+        logger.info("=" * 50)
+        logger.info(f"[系统状态] 运行时间: {elapsed_str}")
+        logger.info(f"  监控币种: {stats['total_symbols']} | 数据就绪: {stats['ready_symbols']} | 符合条件: {stats['qualified_symbols']}")
+
+        if stats['btc_price'] > 0:
+            btc_change = stats['btc_change_5m']
+            btc_status = "正常" if btc_change > -0.01 else "⚠️ 下跌"
+            logger.info(f"  BTC: ${stats['btc_price']:,.2f} ({btc_change:+.2%} 5m) [{btc_status}]")
+
+        logger.info(f"  信号统计: 初筛 {self._signal_count} | 验证通过 {self._validated_count}")
+
+        positions = self._order_manager.open_positions
+        if positions:
+            logger.info(f"  当前持仓: {len(positions)} 个")
+            for p in positions:
+                pnl_pct = p.unrealized_pnl_pct
+                logger.info(
+                    f"    {p.symbol}: 入场 {p.entry_price:.8g}, "
+                    f"最高 {p.highest_price:.8g}, "
+                    f"盈亏 {pnl_pct:+.2%}"
+                )
+        else:
+            logger.info("  当前持仓: 无")
+
+        logger.info("=" * 50)
 
 
 async def main():

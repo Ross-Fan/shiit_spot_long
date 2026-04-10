@@ -104,25 +104,31 @@ class SignalValidator:
             consolidation_task = self._check_consolidation(symbol)
             liquidity_task = self._check_liquidity(symbol)
 
-            consolidation_ok, liquidity_ok, spread = await asyncio.gather(
+            results = await asyncio.gather(
                 consolidation_task,
                 liquidity_task,
                 return_exceptions=True
             )
 
-            # 处理异常
-            if isinstance(consolidation_ok, Exception):
-                logger.warning(f"{symbol} 盘整期检查失败: {consolidation_ok}")
+            consolidation_result = results[0]
+            liquidity_result = results[1]
+
+            # 处理盘整期检查结果
+            if isinstance(consolidation_result, Exception):
+                logger.warning(f"{symbol} 盘整期检查失败: {consolidation_result}")
                 consolidation_ok = True  # 失败时默认通过
-            if isinstance(liquidity_ok, Exception):
-                logger.warning(f"{symbol} 流动性检查失败: {liquidity_ok}")
+            else:
+                consolidation_ok = consolidation_result
+
+            # 处理流动性检查结果
+            if isinstance(liquidity_result, Exception):
+                logger.warning(f"{symbol} 流动性检查失败: {liquidity_result}")
                 liquidity_ok = True
                 spread = 0.0
-
-            # 获取实际的 spread 值
-            if isinstance(spread, tuple):
-                liquidity_ok, spread = spread
-            elif not isinstance(spread, float):
+            elif isinstance(liquidity_result, tuple):
+                liquidity_ok, spread = liquidity_result
+            else:
+                liquidity_ok = True
                 spread = 0.0
 
             # 突破确认

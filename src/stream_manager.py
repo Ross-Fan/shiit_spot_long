@@ -426,7 +426,7 @@ class StreamManager:
             'btc_price': btc_price,
             'btc_change_5m': btc_change_5m,
             'avg_data_minutes': avg_data_minutes,
-            'is_connected': self._ws is not None and self._ws.open if self._ws else False
+            'is_connected': self._ws is not None
         }
 
     def _load_history(self) -> None:
